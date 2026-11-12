@@ -66,7 +66,7 @@ jobs:
                   '    }\n'
                   '    buildTypes {'
               )
-              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 34").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
+              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
               open(kts, "w").write(s)
           EOF
       - name: Build signed APK
