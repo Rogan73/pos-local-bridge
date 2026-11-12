@@ -12,7 +12,28 @@ jobs:
         run: flutter create . --platforms=android
       - name: Add Android permissions
         run: |
-          python3 -c 'p="android/app/src/main/AndroidManifest.xml"; perms="<uses-permission android:name=\"android.permission.INTERNET\" />\n<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />\n<uses-permission android:name=\"android.permission.WAKE_LOCK\" />\n<uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\" />\n<uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />\n<application"; open(p,"w").write(open(p).read().replace("<application",perms,1))'
+          python3 - << 'EOF'
+          import xml.etree.ElementTree as ET
+          path = "android/app/src/main/AndroidManifest.xml"
+          ET.register_namespace("android", "http://schemas.android.com/apk/res/android")
+          tree = ET.parse(path)
+          root = tree.getroot()
+          ns = "{http://schemas.android.com/apk/res/android}"
+          perms = [
+              "android.permission.INTERNET",
+              "android.permission.FOREGROUND_SERVICE",
+              "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+              "android.permission.WAKE_LOCK",
+              "android.permission.RECEIVE_BOOT_COMPLETED",
+              "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+          ]
+          existing = {el.attrib.get(ns + "name") for el in root.findall("uses-permission")}
+          for p in perms:
+              if p not in existing:
+                  el = ET.Element("uses-permission", {ns + "name": p})
+                  root.insert(0, el)
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          EOF
       - name: Configure release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -22,16 +43,32 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/pos-bridge.jks
           printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=pos-bridge.jks\nstoreType=PKCS12\n" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
-          python3 -c '
+          python3 - << 'EOF'
           import os
           kts = "android/app/build.gradle.kts"
           if os.path.exists(kts):
               s = open(kts).read()
-              hdr = "import java.util.Properties\nimport java.io.FileInputStream\nval kp = Properties()\nval kpf = rootProject.file(\"key.properties\")\nif (kpf.exists()) { kp.load(FileInputStream(kpf)) }\n"
-              sc = "signingConfigs {\n        create(\"release\") {\n            keyAlias = kp.getProperty(\"keyAlias\")\n            keyPassword = kp.getProperty(\"keyPassword\")\n            storeFile = file(kp.getProperty(\"storeFile\"))\n            storePassword = kp.getProperty(\"storePassword\")\n        }\n    }\n    buildTypes {"
-              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 34").replace("buildTypes {", sc, 1).replace("signingConfigs.getByName(\"debug\")", "signingConfigs.getByName(\"release\")")
+              hdr = (
+                  'import java.util.Properties\n'
+                  'import java.io.FileInputStream\n'
+                  'val kp = Properties()\n'
+                  'val kpf = rootProject.file("key.properties")\n'
+                  'if (kpf.exists()) { kp.load(FileInputStream(kpf)) }\n'
+              )
+              sc = (
+                  'signingConfigs {\n'
+                  '        create("release") {\n'
+                  '            keyAlias = kp.getProperty("keyAlias")\n'
+                  '            keyPassword = kp.getProperty("keyPassword")\n'
+                  '            storeFile = file(kp.getProperty("storeFile"))\n'
+                  '            storePassword = kp.getProperty("storePassword")\n'
+                  '        }\n'
+                  '    }\n'
+                  '    buildTypes {'
+              )
+              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 34").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
               open(kts, "w").write(s)
-          '
+          EOF
       - name: Build signed APK
         run: |
           flutter build apk --release --split-per-abi
