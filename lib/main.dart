@@ -47,7 +47,7 @@ class BridgeTaskHandler extends TaskHandler {
     res.headers.set('Access-Control-Allow-Origin', '*');
     res.headers.set('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    // Обязательно для современных Chrome/Edge при запросе с HTTPS на 127.0.0.1
+    // Обов'язково для сучасних Chrome/Edge під час запиту з HTTPS на 127.0.0.1
     res.headers.set('Access-Control-Allow-Private-Network', 'true');
   }
 
@@ -55,14 +55,14 @@ class BridgeTaskHandler extends TaskHandler {
     final res = req.response;
     _setCorsHeaders(res);
 
-    // Обработка Preflight OPTIONS от браузера
+    // Обробка Preflight OPTIONS від браузера
     if (req.method == 'OPTIONS') {
       res.statusCode = HttpStatus.noContent;
       await res.close();
       return;
     }
 
-    // Проверка жизни моста (GET http://127.0.0.1:8088/ping)
+    // Перевірка роботи мосту (GET http://127.0.0.1:8088/ping)
     if (req.method == 'GET' && req.uri.path == '/ping') {
       res.headers.contentType = ContentType.json;
       res.write(jsonEncode({'status': 'ok', 'service': 'POS Local Bridge'}));
@@ -82,7 +82,7 @@ class BridgeTaskHandler extends TaskHandler {
         final String payload = data['payload'] ?? '';
 
         if (mode == 'raw_base64') {
-          // Режим печати на IP-принтер (ESC/POS)
+          // Режим друку на IP-принтер (ESC/POS)
           final bytes = base64Decode(payload);
           final socket = await Socket.connect(host, port, timeout: Duration(seconds: timeoutSec));
           socket.add(bytes);
@@ -92,7 +92,7 @@ class BridgeTaskHandler extends TaskHandler {
           res.headers.contentType = ContentType.json;
           res.write(jsonEncode({'ok': true, 'mode': 'raw_base64'}));
         } else {
-          // Режим JSON-протокола ПриватБанка
+          // Режим JSON-протоколу ПриватБанку
           final terminalResponse = await _sendPrivatJson(host, port, payload, timeoutSec);
           res.headers.contentType = ContentType.json;
           res.write(terminalResponse);
@@ -111,9 +111,9 @@ class BridgeTaskHandler extends TaskHandler {
     await res.close();
   }
 
-  /// Работа с TCP-сокетом терминала ПриватБанка:
-  /// Отправляет JSON и собирает входящие JSON-пакеты по балансу скобок {...},
-  /// пропуская промежуточные статусные сообщения до получения финального ответа.
+  /// Робота з TCP-сокетом термінала ПриватБанку:
+  /// Надсилає JSON і збирає вхідні JSON-пакети за балансом дужок {...},
+  /// пропускаючи проміжні статусні повідомлення до отримання фінальної відповіді.
   Future<String> _sendPrivatJson(String host, int port, String jsonPayload, int timeoutSec) async {
     final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
     final completer = Completer<String>();
@@ -135,8 +135,8 @@ class BridgeTaskHandler extends TaskHandler {
           try {
             final parsed = jsonDecode(pkt);
             if (parsed is Map<String, dynamic>) {
-              // В протоколе ПриватБанка промежуточные сообщения содержат step > 0 и не содержат error/params с результатом
-              // Финальный пакет всегда содержит ключ 'error' (true/false)
+              // У протоколі ПриватБанку проміжні повідомлення містять step > 0 і не містять error/params із результатом
+              // Фінальний пакет завжди містить ключ 'error' (true/false)
               if (parsed.containsKey('error')) {
                 timer.cancel();
                 socket.destroy();
@@ -147,7 +147,7 @@ class BridgeTaskHandler extends TaskHandler {
               }
             }
           } catch (_) {
-            // Игнорируем невалидный кусок, если он вдруг попал
+            // Ігноруємо невалідний фрагмент, якщо він раптом потрапив
           }
         }
       },
@@ -168,14 +168,14 @@ class BridgeTaskHandler extends TaskHandler {
       },
     );
 
-    // Отправляем команду на терминал (обычно заканчивается \n или \0, терминал Привата принимает чистый UTF-8 JSON)
+    // Надсилаємо команду на термінал (зазвичай закінчується \n або \0, термінал Привату приймає чистий UTF-8 JSON)
     socket.add(utf8.encode('$jsonPayload\n'));
     await socket.flush();
 
     return completer.future;
   }
 
-  /// Извлекает завершенные JSON-объекты {...} из потокового буфера TCP
+  /// Витягує завершені JSON-об'єкти {...} із потокового буфера TCP
   List<String> _extractCompleteJsonObjects(StringBuffer buffer) {
     final text = buffer.toString();
     final results = <String>[];
@@ -247,7 +247,7 @@ class _BridgeHomePageState extends State<BridgeHomePage> {
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'pos_bridge_channel',
         channelName: 'POS Bridge Service',
-        channelDescription: 'Фоновый сервер для связи с банковским терминалом и принтером',
+        channelDescription: 'Фоновий сервер для зв\'язку з банківським терміналом і принтером',
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
       ),
@@ -257,7 +257,7 @@ class _BridgeHomePageState extends State<BridgeHomePage> {
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.nothing(),
-        autoRunOnBoot: true, // Автозапуск при перезагрузке телефона!
+        autoRunOnBoot: true, // Автозапуск під час перезавантаження телефону!
         allowWakeLock: true,
         allowWifiLock: true,
       ),
@@ -275,8 +275,8 @@ class _BridgeHomePageState extends State<BridgeHomePage> {
     } else {
       await FlutterForegroundTask.startService(
         serviceId: 256,
-        notificationTitle: 'POS-мост активен (127.0.0.1:8088)',
-        notificationText: 'Готов к работе с терминалом и принтером',
+        notificationTitle: 'POS-міст активний (127.0.0.1:8088)',
+        notificationText: 'Готовий до роботи з терміналом і принтером',
         callback: startCallback,
       );
     }
@@ -300,19 +300,19 @@ class _BridgeHomePageState extends State<BridgeHomePage> {
               ),
               const SizedBox(height: 16),
               Text(
-                _isRunning ? 'POS-мост запущен' : 'Запуск сервера...',
+                _isRunning ? 'POS-міст запущено' : 'Запуск сервера...',
                 style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Адрес: http://127.0.0.1:8088\nМожете свернуть это окно и открыть браузер.',
+                'Адреса: http://127.0.0.1:8088\nМожете згорнути це вікно та відкрити браузер.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, fontSize: 15),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _startService,
-                child: const Text('Перезапустить службу'),
+                child: const Text('Перезапустити службу'),
               ),
             ],
           ),
