@@ -1,4 +1,44 @@
-- name: Build signed APK
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Create Android project
+        run: flutter create . --platforms=android
+      - name: Add Android permissions
+        run: |
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n<uses-permission android:name="android.permission.WAKE_LOCK" \/>\n<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" \/>\n<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n<application/' android/app/src/main/AndroidManifest.xml
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/pos-bridge.jks
+          cat <<EOF > android/key.properties
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=pos-bridge.jks
+          storeType=PKCS12
+          EOF
+          if [ -f android/app/build.gradle ]; then
+            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle
+            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
+            sed -i 's/signingConfig = signingConfigs.debug/signingConfig = signingConfigs.release/g' android/app/build.gradle
+            sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
+          fi
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle.kts
+            sed -i 's/signingConfig = signingConfigs.getByName("debug")/signingConfig = signingConfigs.getByName("release")/g' android/app/build.gradle.kts
+          fi
+      - name: Build signed APK
         run: |
           flutter build apk --release --split-per-abi
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/tcp-bridge.apk
