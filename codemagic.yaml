@@ -2,7 +2,6 @@ workflows:
   build-android-apk:
     name: Build Android APK
     max_build_duration: 15
-    instance_type: linux_x2
     scripts:
       - name: Create platform files
         script: flutter create . --platforms=android
