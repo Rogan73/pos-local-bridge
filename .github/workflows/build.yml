@@ -12,7 +12,7 @@ jobs:
         run: flutter create . --platforms=android
       - name: Add Android permissions
         run: |
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n<uses-permission android:name="android.permission.WAKE_LOCK" \/>\n<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" \/>\n<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n<application/' android/app/src/main/AndroidManifest.xml
+          python3 -c 'p="android/app/src/main/AndroidManifest.xml"; perms="<uses-permission android:name=\"android.permission.INTERNET\" />\n<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />\n<uses-permission android:name=\"android.permission.WAKE_LOCK\" />\n<uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\" />\n<uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />\n<application"; open(p,"w").write(open(p).read().replace("<application",perms,1))'
       - name: Configure release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -21,23 +21,17 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/pos-bridge.jks
-          cat <<EOF > android/key.properties
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=pos-bridge.jks
-          storeType=PKCS12
-          EOF
-          if [ -f android/app/build.gradle ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
-            sed -i 's/signingConfig = signingConfigs.debug/signingConfig = signingConfigs.release/g' android/app/build.gradle
-            sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' android/app/build.gradle
-          fi
-          if [ -f android/app/build.gradle.kts ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle.kts
-            sed -i 's/signingConfig = signingConfigs.getByName("debug")/signingConfig = signingConfigs.getByName("release")/g' android/app/build.gradle.kts
-          fi
+          printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=pos-bridge.jks\nstoreType=PKCS12\n" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+          python3 -c '
+          import os
+          kts = "android/app/build.gradle.kts"
+          if os.path.exists(kts):
+              s = open(kts).read()
+              hdr = "import java.util.Properties\nimport java.io.FileInputStream\nval kp = Properties()\nval kpf = rootProject.file(\"key.properties\")\nif (kpf.exists()) { kp.load(FileInputStream(kpf)) }\n"
+              sc = "signingConfigs {\n        create(\"release\") {\n            keyAlias = kp.getProperty(\"keyAlias\")\n            keyPassword = kp.getProperty(\"keyPassword\")\n            storeFile = file(kp.getProperty(\"storeFile\"))\n            storePassword = kp.getProperty(\"storePassword\")\n        }\n    }\n    buildTypes {"
+              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 34").replace("buildTypes {", sc, 1).replace("signingConfigs.getByName(\"debug\")", "signingConfigs.getByName(\"release\")")
+              open(kts, "w").write(s)
+          '
       - name: Build signed APK
         run: |
           flutter build apk --release --split-per-abi
