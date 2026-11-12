@@ -1,0 +1,15 @@
+workflows:
+  build-android-apk:
+    name: Build Android APK
+    max_build_duration: 15
+    instance_type: linux_x2
+    scripts:
+      - name: Create platform files
+        script: flutter create . --platforms=android
+      - name: Add Android permissions
+        script: |
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n<uses-permission android:name="android.permission.WAKE_LOCK" \/>\n<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" \/>\n<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n<application/' android/app/src/main/AndroidManifest.xml
+      - name: Build APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
