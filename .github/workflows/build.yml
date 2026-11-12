@@ -35,14 +35,24 @@ jobs:
           tree.write(path, encoding="utf-8", xml_declaration=True)
           EOF
       - name: Configure release signing
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > raw.pfx
-          openssl pkcs12 -in raw.pfx -passin pass:rikoriko -nodes -out temp.pem -legacy || openssl pkcs12 -in raw.pfx -passin pass:rikoriko -nodes -out temp.pem
-          openssl pkcs12 -export -in temp.pem -out android/app/pos-bridge.jks -name "posbridge" -passout pass:rikoriko
           python3 - << 'EOF'
-          import os
+          import os, subprocess
+          # Генерируем чистый стандартный JKS, если его еще нет в репозитории
+          if not os.path.exists("pos-bridge.jks"):
+              subprocess.run([
+                  "keytool", "-genkeypair", "-v",
+                  "-keystore", "android/app/pos-bridge.jks",
+                  "-storetype", "PKCS12",
+                  "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
+                  "-alias", "posbridge",
+                  "-storepass", "rikoriko", "-keypass", "rikoriko",
+                  "-dname", "CN=POSBridge, OU=Dev, O=RikoSoft, L=Valencia, S=Valencia, C=ES"
+              ], check=True)
+          else:
+              import shutil
+              shutil.copy("pos-bridge.jks", "android/app/pos-bridge.jks")
+
           kts = "android/app/build.gradle.kts"
           if os.path.exists(kts):
               s = open(kts).read()
@@ -60,6 +70,16 @@ jobs:
               s = s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
               open(kts, "w").write(s)
           EOF
+      - name: Save keystore to repo (first run only)
+        run: |
+          if [ ! -f pos-bridge.jks ]; then
+            cp android/app/pos-bridge.jks pos-bridge.jks
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add pos-bridge.jks
+            git commit -m "Save persistent keystore" || true
+            git push || true
+          fi
       - name: Build signed APK
         run: |
           flutter build apk --release --split-per-abi
