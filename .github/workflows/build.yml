@@ -1,17 +1,8 @@
-name: Build APK
-on: [push, workflow_dispatch]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-      - run: flutter create . --platforms=android
-      - run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n<uses-permission android:name="android.permission.WAKE_LOCK" \/>\n<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" \/>\n<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n<application/' android/app/src/main/AndroidManifest.xml
-      - run: flutter build apk --release
+- name: Build signed APK
+        run: |
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/tcp-bridge.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: tcp-bridge
+          path: build/app/outputs/flutter-apk/tcp-bridge.apk
