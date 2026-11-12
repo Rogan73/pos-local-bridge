@@ -11,14 +11,15 @@ workflows:
       - name: Add Android permissions
         script: |
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE" \/>\n<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" \/>\n<uses-permission android:name="android.permission.WAKE_LOCK" \/>\n<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" \/>\n<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n<application/' android/app/src/main/AndroidManifest.xml
-      - name: Generate keystore and configure signing
+      - name: Configure signing and Gradle
         script: |
-          keytool -genkey -v -keystore android/app/pos-bridge.jks -keyalg RSA -keysize 2048 -validity 10000 -alias "$CM_KEY_ALIAS" -storepass "$CM_KEYSTORE_PASSWORD" -keypass "$CM_KEY_PASSWORD" -dname "CN=POS Bridge, OU=Dev, O=RikoSoft, L=Valencia, S=Valencia, C=ES"
+          echo "$CM_KEYSTORE" | base64 --decode > android/app/pos-bridge.jks
           cat <<EOF > android/key.properties
           storePassword=$CM_KEYSTORE_PASSWORD
           keyPassword=$CM_KEY_PASSWORD
           keyAlias=$CM_KEY_ALIAS
           storeFile=pos-bridge.jks
+          storeType=PKCS12
           EOF
           if [ -f android/app/build.gradle ]; then
             sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 34/g' android/app/build.gradle
@@ -30,4 +31,3 @@ workflows:
         script: flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
-      - android/app/pos-bridge.jks
