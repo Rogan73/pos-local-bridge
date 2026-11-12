@@ -1,0 +1,19 @@
+name: pos_local_bridge
+description: Local HTTP to TCP Socket Bridge for PrivatBank POS and IP Printers
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_foreground_task: ^8.11.0 # Держит сервер живым в фоне на Android
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
