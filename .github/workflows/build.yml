@@ -37,36 +37,27 @@ jobs:
       - name: Configure release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/pos-bridge.jks
-          printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=pos-bridge.jks\nstoreType=PKCS12\n" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+          echo "$KEYSTORE_BASE64" | base64 --decode > raw.pfx
+          openssl pkcs12 -in raw.pfx -passin pass:rikoriko -nodes -out temp.pem -legacy || openssl pkcs12 -in raw.pfx -passin pass:rikoriko -nodes -out temp.pem
+          openssl pkcs12 -export -in temp.pem -out android/app/pos-bridge.jks -name "posbridge" -passout pass:rikoriko
           python3 - << 'EOF'
           import os
           kts = "android/app/build.gradle.kts"
           if os.path.exists(kts):
               s = open(kts).read()
-              hdr = (
-                  'import java.util.Properties\n'
-                  'import java.io.FileInputStream\n'
-                  'val kp = Properties()\n'
-                  'val kpf = rootProject.file("key.properties")\n'
-                  'if (kpf.exists()) { kp.load(FileInputStream(kpf)) }\n'
-              )
               sc = (
                   'signingConfigs {\n'
                   '        create("release") {\n'
-                  '            keyAlias = kp.getProperty("keyAlias")\n'
-                  '            keyPassword = kp.getProperty("keyPassword")\n'
-                  '            storeFile = file(kp.getProperty("storeFile"))\n'
-                  '            storePassword = kp.getProperty("storePassword")\n'
+                  '            keyAlias = "posbridge"\n'
+                  '            keyPassword = "rikoriko"\n'
+                  '            storeFile = file("pos-bridge.jks")\n'
+                  '            storePassword = "rikoriko"\n'
                   '        }\n'
                   '    }\n'
                   '    buildTypes {'
               )
-              s = hdr + s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
+              s = s.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36").replace("buildTypes {", sc, 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
               open(kts, "w").write(s)
           EOF
       - name: Build signed APK
